@@ -1,7 +1,7 @@
 const express = require('express')
 const app = express() ;
 const cors = require('cors')
-// const jwt = require('jsonwebtoken') 
+const jwt = require('jsonwebtoken') 
 require('dotenv').config() 
 // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000 ;
@@ -27,6 +27,44 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
+
+    const userCollection = client.db("hostelDB").collection("users");
+
+    
+
+      // jwt related api
+      app.post('/jwt', async (req, res) => {
+        const user = req.body;
+        const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        res.send({ token });
+      })
+  
+
+      // users related api
+      app.get('/users', async (req, res) => {
+        const result = await userCollection.find().toArray();
+        res.send(result);
+      });
+
+
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      // insert email if user doesnt exists: 
+      // you can do this many ways (1. email unique, 2. upsert 3. simple checking)
+      const query = { email: user.email }
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: 'user already exists', insertedId: null })
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+
+
+
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
