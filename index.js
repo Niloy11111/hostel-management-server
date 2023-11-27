@@ -6,12 +6,14 @@ require('dotenv').config()
 // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000 ;
 
+
+
 // middleware
 app.use(cors()) ;
 app.use(express.json())
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.tg0ohza.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -29,22 +31,79 @@ async function run() {
     // await client.connect();
 
     const userCollection = client.db("hostelDB").collection("users");
+    const mealCollection = client.db("hostelDB").collection("Meals");
+    const upcomingMealCollection = client.db("hostelDB").collection("upcomingMeals");
 
     
 
       // jwt related api
       app.post('/jwt', async (req, res) => {
         const user = req.body;
-        const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '7h' });
         res.send({ token });
       })
+
+        // middlewares 
+    const verifyToken = (req, res, next) => {
+      console.log('inside again verify token', req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
+      }
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: 'unauthorized access' })
+        }
+        req.decoded = decoded;
+        next();
+      })
+    }
+
+      // use verify admin after verifyToken
+      const verifyAdmin = async (req, res, next) => {
+        const email = req.decoded.email;
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        const isAdmin = user?.role === 'admin';
+        if (!isAdmin) {
+          return res.status(403).send({ message: 'forbidden access' });
+        }
+        next();
+      }
+
+      //meal related api 
+      app.get('/meals', async (req, res) => {
+        const result = await mealCollection.find().toArray();
+        res.send(result);
+      });
+
+      app.get('/upcomingMeals', async (req, res) => {
+        const result = await upcomingMealCollection.find().toArray();
+        res.send(result);
+      });
   
 
       // users related api
-      app.get('/users', async (req, res) => {
+      app.get('/users',verifyToken,verifyAdmin, async (req, res) => {
         const result = await userCollection.find().toArray();
         res.send(result);
       });
+
+      app.get('/users/admin/:email', verifyToken, async (req, res) => {
+        const email = req.params.email;
+  
+        if (email !== req.decoded.email) {
+          return res.status(403).send({ message: 'forbidden access' })
+        }
+  
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let admin = false;
+        if (user) {
+          admin = user?.role === 'admin';
+        }
+        res.send({ admin });
+      })
 
 
     app.post('/users', async (req, res) => {
@@ -60,8 +119,31 @@ async function run() {
       res.send(result);
     });
 
+    app.patch('/users/admin/:id', verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: 'admin'
+        }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
+  // add meal 
+  app.post('/meals', async(req, res) => {
+    const meal = req.body ;
+    const result = await mealCollection.insertOne(meal);
+    res.send(result);
+  })
 
 
+  app.post('/upcomingMeals', async(req, res) => {
+    const upcomingMeal = req.body ;
+    const result = await upcomingMealCollection.insertOne(upcomingMeal);
+    res.send(result);
+  })
 
 
 
