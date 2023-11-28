@@ -33,6 +33,8 @@ async function run() {
     const userCollection = client.db("hostelDB").collection("users");
     const mealCollection = client.db("hostelDB").collection("Meals");
     const upcomingMealCollection = client.db("hostelDB").collection("upcomingMeals");
+    const requestedMealCollection = client.db("hostelDB").collection("requestedMeal");
+    const reviewCollection = client.db("hostelDB").collection("reviews");
 
     
 
@@ -45,7 +47,7 @@ async function run() {
 
         // middlewares 
     const verifyToken = (req, res, next) => {
-      console.log('inside again verify token', req.headers.authorization);
+      // console.log('inside again verify token', req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'unauthorized access' });
       }
@@ -77,6 +79,15 @@ async function run() {
         res.send(result);
       });
 
+      //get meals by id
+      app.get('/meals/:id', async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) }
+        const result = await mealCollection.findOne(query);
+        res.send(result);
+      })
+
+
       app.get('/upcomingMeals', async (req, res) => {
         const result = await upcomingMealCollection.find().toArray();
         res.send(result);
@@ -103,13 +114,39 @@ async function run() {
           admin = user?.role === 'admin';
         }
         res.send({ admin });
-      })
+      }) 
+
+      //get reviews 
+      app.get('/reviews', async (req, res) => {
+        console.log(req.query)
+        let query = {} ;
+  
+        if(req.query?.userEmail){
+          query = { userEmail : req.query.userEmail }
+        }
+        
+        const cursor = reviewCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+      });
+
+      //get requestedMeal
+      app.get('/requestedMeals', async (req, res) => {
+        console.log(req.query)
+        let query = {} ;
+  
+        if(req.query?.userEmail){
+          query = { userEmail : req.query.userEmail }
+        }
+        
+        const cursor = reviewCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+      });
 
 
     app.post('/users', async (req, res) => {
       const user = req.body;
-      // insert email if user doesnt exists: 
-      // you can do this many ways (1. email unique, 2. upsert 3. simple checking)
       const query = { email: user.email }
       const existingUser = await userCollection.findOne(query);
       if (existingUser) {
@@ -118,6 +155,50 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
+
+    app.post('/likedMeals', async (req, res) => {
+      const likedMeal = req.body;
+      const mealId = likedMeal.mealId;
+      const state = likedMeal.state;
+    
+      // Retrieve the current 'likes' value
+      const meal = await mealCollection.findOne({ _id: new ObjectId(mealId) });
+      const currentLikes = parseFloat(meal.likes) || 0;
+    
+      // Update 'likes' field based on the state
+      const updatedLikes = state ? currentLikes - 1 : currentLikes + 1;
+    
+      // Update the document with the new 'likes' value
+      await mealCollection.updateOne(
+        { _id: new ObjectId(mealId) },
+        { $set: { likes: updatedLikes.toString() } }
+      );
+    
+      res.send({ success: true });
+    });
+    
+    //likes count 
+    // app.post('/likedMeals',  async (req, res) => {
+    //   const likedMeal = req.body ; 
+    //   const mealId = likedMeal.mealId ;
+    //   const state = likedMeal.state ;
+    //   const meal = await mealCollection.findOne({ _id : new ObjectId(mealId)}) ;
+
+    //   const currentLikes = parseFloat(meal.likes) || 0; // Convert to float or default to 0
+    
+    //  const likesIncrease = currentLikes + 1;
+     
+    //  const likesDecrease = currentLikes - 1 ;
+    // if(!state){
+    //   await mealCollection.updateOne({ _id: new ObjectId(mealId) }, { $set: { likes: likesIncrease.toString() } });
+    // }
+    // else{
+    //   await mealCollection.updateOne({ _id: new ObjectId(mealId) }, { $set: { likes: likesDecrease.toString() } });
+    // }
+    // const result = await likedMealCollection.insertOne(likedMeal) ;
+    // res.send(result)
+    // })
+
 
     app.patch('/users/admin/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
@@ -142,6 +223,20 @@ async function run() {
   app.post('/upcomingMeals', async(req, res) => {
     const upcomingMeal = req.body ;
     const result = await upcomingMealCollection.insertOne(upcomingMeal);
+    res.send(result);
+  })
+
+  //meal request 
+  app.post('/mealRequest', async(req, res) => {
+    const meal = req.body ;
+    const result = await requestedMealCollection.insertOne(meal);
+    res.send(result);
+  })
+  app.post('/reviews', async(req, res) => {
+    const userEmail = req.body.userEmail ;
+    console.log(userEmail)
+    const meal = req.body ;
+    const result = await reviewCollection.insertOne(meal);
     res.send(result);
   })
 
