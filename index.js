@@ -144,7 +144,7 @@ async function run() {
       }) 
 
       //get reviews 
-      app.get('/reviews',verifyToken,verifyAdmin, async (req, res) => {
+      app.get('/reviews', async (req, res) => {
         console.log(req.query)
         let query = {} ;
   
