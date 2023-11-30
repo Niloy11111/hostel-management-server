@@ -36,7 +36,7 @@ async function run() {
     const requestedMealCollection = client.db("hostelDB").collection("requestedMeal");
     const reviewCollection = client.db("hostelDB").collection("reviews");
     const membershipCollection = client.db("hostelDB").collection("membershipPlans");
-    const paymentCollection = client.db("bistroDb").collection("payments");
+    const paymentCollection = client.db("hostelDB").collection("payments");
     
 
       // jwt related api
@@ -48,7 +48,7 @@ async function run() {
 
         // middlewares 
     const verifyToken = (req, res, next) => {
-      // console.log('inside again verify token', req.headers.authorization);
+      console.log('inside again verify token', req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'unauthorized access' });
       }
@@ -93,7 +93,7 @@ async function run() {
         res.send(result);
       });
 
-      //get meals by id
+      //get meals by i
       app.get('/meals/:id', async (req, res) => {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) }
@@ -102,7 +102,7 @@ async function run() {
       })
 
 
-      app.get('/upcomingMeals', async (req, res) => {
+      app.get('/upcomingMeals',verifyToken, verifyAdmin, async (req, res) => {
         const result = await upcomingMealCollection.find().toArray();
         res.send(result);
       });
@@ -144,7 +144,7 @@ async function run() {
       }) 
 
       //get reviews 
-      app.get('/reviews', async (req, res) => {
+      app.get('/reviews',verifyToken,verifyAdmin, async (req, res) => {
         console.log(req.query)
         let query = {} ;
   
@@ -172,6 +172,14 @@ async function run() {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) }
         const result = await reviewCollection.deleteOne(query);
+        res.send(result);
+      })
+
+      //delete meals from allMeals
+      app.delete('/meals/:id', async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) }
+        const result = await mealCollection.deleteOne(query);
         res.send(result);
       })
 
@@ -370,13 +378,23 @@ async function run() {
       })
     });
 
+   
+    app.get('/payments/:email',verifyToken, async (req, res) => {
+      const query = { email: req.params.email }
+      console.log('sdkjfsdk', query.email)
+      if (req.params.email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    })
+
     app.post('/payments', async (req, res) => {
       const payment = req.body;
       const paymentResult = await paymentCollection.insertOne(payment);
 
       res.send({ paymentResult });
     })
-
 
 
 
