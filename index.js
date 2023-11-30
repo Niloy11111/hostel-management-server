@@ -3,7 +3,7 @@ const app = express() ;
 const cors = require('cors')
 const jwt = require('jsonwebtoken') 
 require('dotenv').config() 
-// const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000 ;
 
 
@@ -35,7 +35,8 @@ async function run() {
     const upcomingMealCollection = client.db("hostelDB").collection("upcomingMeals");
     const requestedMealCollection = client.db("hostelDB").collection("requestedMeal");
     const reviewCollection = client.db("hostelDB").collection("reviews");
-
+    const membershipCollection = client.db("hostelDB").collection("membershipPlans");
+    const paymentCollection = client.db("bistroDb").collection("payments");
     
 
       // jwt related api
@@ -75,7 +76,20 @@ async function run() {
 
       //meal related api 
       app.get('/meals', async (req, res) => {
-        const result = await mealCollection.find().toArray();
+        const filter = req.query ;
+        
+        const searchQuery = String(filter.search || '');
+
+  const query = {
+    name: { $regex: searchQuery, $options: 'i' }
+  };
+        const options = {
+          sort : {
+            price : filter.sort === 'asc' ? 1 : -1
+          }
+        }
+
+        const result = await mealCollection.find(query, options).toArray();
         res.send(result);
       });
 
@@ -90,6 +104,19 @@ async function run() {
 
       app.get('/upcomingMeals', async (req, res) => {
         const result = await upcomingMealCollection.find().toArray();
+        res.send(result);
+      });
+
+      //get membership data 
+      app.get('/plans', async (req, res) => {
+        
+        const result = await membershipCollection.find().toArray();
+        res.send(result);
+      });
+  
+      app.get('/plans/:planName', async (req, res) => {
+        const filter = {planName : req.params.planName}
+        const result = await membershipCollection.find(filter).toArray();
         res.send(result);
       });
   
@@ -247,6 +274,28 @@ async function run() {
     
       res.send({ success: true });
     });
+
+    // upcoming meal likes handle
+    app.post('/likedMealsUpcoming', async (req, res) => {
+      const likedMeal = req.body;
+      const mealId = likedMeal.mealId;
+      const state = likedMeal.state;
+    
+      // Retrieve the current 'likes' value
+      const meal = await upcomingMealCollection.findOne({ _id: new ObjectId(mealId) });
+      const currentLikes = parseFloat(meal.likes) || 0;
+    
+      // Update 'likes' field based on the state
+      const updatedLikes = state ? currentLikes - 1 : currentLikes + 1;
+    
+      // Update the document with the new 'likes' value
+      await upcomingMealCollection.updateOne(
+        { _id: new ObjectId(mealId) },
+        { $set: { likes: updatedLikes.toString() } }
+      );
+    
+      res.send({ success: true });
+    });
     
 
 
@@ -303,6 +352,31 @@ async function run() {
     const result = await reviewCollection.insertOne(meal);
     res.send(result);
   })
+
+    // payment intent
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount, 'amount inside the intent')
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    });
+
+    app.post('/payments', async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+
+      res.send({ paymentResult });
+    })
+
 
 
 
