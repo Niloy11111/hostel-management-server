@@ -237,7 +237,7 @@ async function run() {
       })
 
       //get requestedMeal
-      app.get('/requestedMeals', async (req, res) => {
+      app.get('/requestedMeals',verifyToken, async (req, res) => {
         console.log(req.query)
         let query = {} ;
   
