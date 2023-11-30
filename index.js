@@ -48,7 +48,7 @@ async function run() {
 
         // middlewares 
     const verifyToken = (req, res, next) => {
-      console.log('inside again verify token', req.headers.authorization);
+      // console.log('inside again verify token', req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'unauthorized access' });
       }
@@ -102,7 +102,7 @@ async function run() {
       })
 
 
-      app.get('/upcomingMeals',verifyToken, verifyAdmin, async (req, res) => {
+      app.get('/upcomingMeals', async (req, res) => {
         const result = await upcomingMealCollection.find().toArray();
         res.send(result);
       });
@@ -399,8 +399,8 @@ async function run() {
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
