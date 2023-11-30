@@ -101,11 +101,11 @@ async function run() {
         res.send(result);
       })
 
-
       app.get('/upcomingMeals', async (req, res) => {
         const result = await upcomingMealCollection.find().toArray();
         res.send(result);
       });
+    
 
       //get membership data 
       app.get('/plans', async (req, res) => {
