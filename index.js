@@ -396,6 +396,13 @@ async function run() {
       res.send({ paymentResult });
     })
 
+    app.get('/payments', async(req, res) => {
+      const cursor = paymentCollection.find();
+      const result = await cursor.toArray();
+     
+      res.send(result)
+    })
+
 
 
     // Send a ping to confirm a successful connection
