@@ -301,47 +301,18 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/UpcominglikedMeals/:id", async (req, res) => {
+    app.patch("/upcominglikeAddRemove/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
 
-      const userLiked = req.body.userLiked;
+      const { userLiked, uid } = req.body;
 
-      const result = await upcomingMealCollection.updateOne(
-        filter,
-        userLiked
-          ? {
-              $inc: { likes: -1 },
-            }
-          : {
-              $inc: { likes: 1 },
-            }
-      );
+      const updated = userLiked
+        ? { $pull: { likedUsers: uid }, $inc: { likes: -1 } }
+        : { $push: { likedUsers: uid }, $inc: { likes: 1 } };
+
+      const result = await upcomingMealCollection.updateOne(filter, updated);
       res.send(result);
-    });
-
-    // upcoming meal likes handle
-    app.post("/likedMealsUpcoming", async (req, res) => {
-      const likedMeal = req.body;
-      const mealId = likedMeal.mealId;
-      const state = likedMeal.state;
-
-      // Retrieve the current 'likes' value
-      const meal = await upcomingMealCollection.findOne({
-        _id: new ObjectId(mealId),
-      });
-      const currentLikes = parseFloat(meal.likes) || 0;
-
-      // Update 'likes' field based on the state
-      const updatedLikes = state ? currentLikes - 1 : currentLikes + 1;
-
-      // Update the document with the new 'likes' value
-      await upcomingMealCollection.updateOne(
-        { _id: new ObjectId(mealId) },
-        { $set: { likes: updatedLikes.toString() } }
-      );
-
-      res.send({ success: true });
     });
 
     app.patch("/users/admin/:id", verifyToken, async (req, res) => {
@@ -389,7 +360,8 @@ async function run() {
     app.post("/addToProductionList", async (req, res) => {
       const productionMeal = req.body;
       const result = await productionMealCollection.insertOne(productionMeal);
-      res.send(result);
+      const allProductions = await productionMealCollection.find().toArray();
+      res.send({ result, allProductions });
     });
 
     app.get("/productionMeals", async (req, res) => {
