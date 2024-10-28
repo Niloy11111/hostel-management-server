@@ -385,25 +385,52 @@ async function run() {
 
     // payment intent
     app.post("/create-payment-intent", async (req, res) => {
-      const { price } = req.body;
+      const { price, email } = req.body;
       const amount = parseInt(price * 100);
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "usd",
-        payment_method_types: ["card"],
-      });
+      // console.log("email", email);
 
-      res.send({
-        clientSecret: paymentIntent.client_secret,
-      });
+      const query = { email: email };
+      const latestPayment = await paymentCollection
+        .find(query)
+        .sort({ createdAt: -1 })
+        .limit(1)
+        .toArray();
+
+      if (latestPayment) {
+        const createdAtMs = new Date(latestPayment[0].createdAt).getTime();
+        const currentDateMs = Date.now();
+        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+        // const thirtyDaysInMs = 1 * 60 * 1000;
+
+        if (currentDateMs - createdAtMs < thirtyDaysInMs) {
+          return res.status(403).json({
+            message: "Access denied. You can only pay once every 30 days.",
+          });
+        }
+      }
+
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      } catch (error) {
+        console.error("Error creating payment intent:", error);
+        res.status(500).send("Internal Server Error");
+      }
     });
 
     app.get("/payments/:email", verifyToken, async (req, res) => {
       const query = { email: req.params.email };
 
       if (req.params.email !== req.decoded.email) {
-        return res.status(403).send({ message: "forbidden access" });
+        return res.send({ message: "forbidden access" });
       }
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
